@@ -1,6 +1,6 @@
 import { ReporterOptions, resolveConfig } from './config';
 import { getCases, ImportAttachment, postImport } from './httpClient';
-import { readAttachments } from './attachmentStore';
+import { clearAttachments, readAttachments } from './attachmentStore';
 import { buildJUnitXml, SpecResultLike } from './xmlBuilder';
 import { writeResultMarker } from './resultMarker';
 import * as path from 'path';
@@ -123,6 +123,7 @@ export class TestPulseReporter {
         // eslint-disable-next-line no-console
         console.log(`testpulse-jasmine: all tests matched, created run ${body.key}`);
         writeResultMarker({ failed: false });
+        clearAttachments(process.cwd());
       } else if (result.status === 207) {
         const body = result.body as { matched?: number; unmatched?: Array<{ caseKey: string }> };
         const unmatched = body.unmatched ?? [];
@@ -139,6 +140,7 @@ export class TestPulseReporter {
         } else {
           writeResultMarker({ failed: false });
         }
+        clearAttachments(process.cwd());
       } else {
         // eslint-disable-next-line no-console
         console.error(`testpulse-jasmine: submission failed: status ${result.status}: ${JSON.stringify(result.body)}`);

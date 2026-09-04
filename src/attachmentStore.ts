@@ -50,35 +50,60 @@ export interface StoredAttachment extends StoredAttachmentMeta {
 }
 
 /**
- * Recursively searches searchRoot for .testpulse/attachments directories
- * and reads every <hash>.json + <hash>.data pair found. Skips (rather
- * than throwing on) a malformed or partially-written sidecar -- a real,
- * ordinary occurrence if a process is killed mid-write (CI timeout,
- * OOM-kill), not just an adversarial-input concern, the same lesson
- * learned the hard way in the gtest plugin's own post-implementation
- * review.
+ * Removes the attachment scratch directory after a successful submission.
+ * Without this, a persistent (non-ephemeral) workspace would resubmit a
+ * stale attachment alongside a fresh one under the same case key on a
+ * later run, since readAttachments() has no way to tell "written this
+ * run" from "written last week" -- a narrower, same-case-key variant of
+ * the cross-run contamination bug already guarded against for different
+ * case keys. Never called on a failed submission, so a retry still has
+ * the attachments to resubmit.
  */
-export function readAttachments(searchRoot: string): StoredAttachment[] {
-  const result: StoredAttachment[] = [];
-  walk(searchRoot, result);
-  return result;
+export function clearAttachments(searchRoot: string): void {
+  fs.rmSync(path.join(searchRoot, '.testpulse', 'attachments'), { recursive: true, force: true });
 }
 
-function walk(dir: string, result: StoredAttachment[]): void {
+/**
+ * Reads every <hash>.json + <hash>.data pair from exactly
+ * <searchRoot>/.testpulse/attachments -- writeAttachment() never creates
+ * subdirectories there, so this is a flat, non-recursive read, not a
+ * tree walk. Scoping to this exact path (rather than recursively
+ * matching any directory named "attachments" anywhere under searchRoot,
+ * as an earlier version did) closes a real gap found in post-implementation
+ * review: an unrelated "attachments" directory elsewhere in the tree
+ * (e.g. inside node_modules, or planted by a compromised dependency)
+ * must never be treated as a source of real attachments.
+ *
+ * Also re-validates each sidecar's contentType against the same
+ * allowlist writeAttachment()'s caller (Attach()) already enforces --
+ * the allowlist is a real security boundary, not just a write-time nicety,
+ * so it must hold on the read path a submission is actually built from too.
+ *
+ * Skips (rather than throws on) a malformed or partially-written sidecar --
+ * a real, ordinary occurrence if a process is killed mid-write (CI timeout,
+ * OOM-kill), not just an adversarial-input concern, the same lesson learned
+ * the hard way in the gtest plugin's own post-implementation review.
+ */
+export function readAttachments(searchRoot: string): StoredAttachment[] {
+  const dir = path.join(searchRoot, '.testpulse', 'attachments');
+  const result: StoredAttachment[] = [];
   if (!fs.existsSync(dir)) {
-    return;
+    return result;
   }
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    if (entry.isDirectory() || !entry.name.endsWith('.json')) {
+      continue;
+    }
     const fullPath = path.join(dir, entry.name);
-    if (entry.isDirectory()) {
-      walk(fullPath, result);
-      continue;
-    }
-    if (!entry.name.endsWith('.json') || path.basename(dir) !== 'attachments') {
-      continue;
-    }
     try {
       const meta: StoredAttachmentMeta = JSON.parse(fs.readFileSync(fullPath, 'utf8'));
+      if (!isSupportedContentType(meta.contentType)) {
+        // eslint-disable-next-line no-console
+        console.error(
+          `testpulse-jasmine: skipping attachment sidecar ${fullPath}: unsupported content type "${meta.contentType}"`,
+        );
+        continue;
+      }
       const dataPath = fullPath.replace(/\.json$/, '.data');
       if (!fs.existsSync(dataPath)) {
         continue;
@@ -92,4 +117,5 @@ function walk(dir: string, result: StoredAttachment[]): void {
       );
     }
   }
+  return result;
 }

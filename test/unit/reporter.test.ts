@@ -3,6 +3,7 @@ import * as os from 'os';
 import * as path from 'path';
 import { TestPulseReporter } from '../../src/reporter';
 import { readResultMarker } from '../../src/resultMarker';
+import { writeAttachment } from '../../src/attachmentStore';
 import * as httpClient from '../../src/httpClient';
 
 jest.mock('../../src/httpClient');
@@ -114,6 +115,36 @@ describe('TestPulseReporter', () => {
     reporter.specDone(specResult());
     await reporter.jasmineDone();
     expect(readResultMarker()).toEqual({ present: true, marker: { failed: true } });
+  });
+
+  it('prunes .testpulse/attachments after a successful (201) submission', async () => {
+    mockedHttpClient.postImport.mockResolvedValue({ status: 201, body: { key: 'LOGIN-R1' } });
+    writeAttachment('LOGIN-42', Buffer.from([1]), 'shot.png', 'image/png');
+    const reporter = makeReporter();
+    reporter.specDone(specResult());
+    await reporter.jasmineDone();
+    expect(fs.existsSync(path.join(cwd, '.testpulse', 'attachments'))).toBe(false);
+  });
+
+  it('prunes .testpulse/attachments after a successful (207) submission', async () => {
+    mockedHttpClient.postImport.mockResolvedValue({
+      status: 207,
+      body: { matched: 0, unmatched: [{ caseKey: 'LOGIN-42' }] },
+    });
+    writeAttachment('LOGIN-42', Buffer.from([1]), 'shot.png', 'image/png');
+    const reporter = makeReporter();
+    reporter.specDone(specResult());
+    await reporter.jasmineDone();
+    expect(fs.existsSync(path.join(cwd, '.testpulse', 'attachments'))).toBe(false);
+  });
+
+  it('leaves .testpulse/attachments in place after a failed submission, for a retry', async () => {
+    mockedHttpClient.postImport.mockResolvedValue({ status: 500, body: { error: 'boom' } });
+    writeAttachment('LOGIN-42', Buffer.from([1]), 'shot.png', 'image/png');
+    const reporter = makeReporter();
+    reporter.specDone(specResult());
+    await reporter.jasmineDone();
+    expect(fs.existsSync(path.join(cwd, '.testpulse', 'attachments'))).toBe(true);
   });
 
   it('never logs the token', async () => {
