@@ -51,7 +51,7 @@ describe('submission (real jasmine run)', () => {
         unmatched: [{ caseKey: 'LOGIN-42', verdict: 'passed' }],
       },
     }));
-    const fixtureDir = path.join(__dirname, '../fixtures/tagged');
+    const fixtureDir = path.join(__dirname, '../fixtures/tagged-unmatched');
     const testpulseDir = path.join(fixtureDir, '.testpulse');
     fs.rmSync(testpulseDir, { recursive: true, force: true });
 
