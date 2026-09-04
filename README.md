@@ -40,9 +40,11 @@ module.exports = {
 };
 ```
 
-If your project currently uses `spec/support/jasmine.json`, delete it
-and point your `jasmine` invocation at the `.js` file instead (or add
-both — Jasmine picks whichever config format you pass via `--config=`).
+If your project currently uses a `spec/support/jasmine.json` or
+`jasmine.mjs` config (the default `jasmine init` now generates
+`jasmine.mjs`), delete it and point your `jasmine` invocation at the
+`.js` file above instead (or add both — Jasmine picks whichever config
+format you pass via `--config=`).
 
 ## Tag your specs
 
@@ -63,8 +65,18 @@ to influence it, `testpulse-jasmine check` is the only thing that can
 fail the build for a submission error or an unmatched case:
 
 ```sh
-jasmine && testpulse-jasmine check
+jasmine; jasmine_status=$?
+testpulse-jasmine check; check_status=$?
+[ "$jasmine_status" -eq 0 ] && [ "$check_status" -eq 0 ]
 ```
+
+**Don't chain these with `&&`** (`jasmine && testpulse-jasmine check`) —
+when a spec fails, `jasmine` exits non-zero and `&&` short-circuits,
+so `check` never runs and its own diagnostic (e.g. "submission failed:
+status 401") never prints, even though the overall exit code happens to
+still be non-zero from the spec failure alone. In CI, running each as
+its own step (rather than one shell line) sidesteps this automatically,
+since most CI systems already fail the job on any non-zero step.
 
 ## Attach screenshots/files
 
@@ -89,8 +101,9 @@ are written to a `.testpulse/` scratch directory — **add it to your
 
 ## Configuration
 
-Settings resolve reporter option, then environment variable. There is no
-third, config-file-backed tier.
+**The environment variable always wins over the reporter option**, for
+every setting below — not just `token`. There is no third,
+config-file-backed tier.
 
 | Setting | Reporter option | Env var |
 |---|---|---|
@@ -102,7 +115,11 @@ third, config-file-backed tier.
 
 **Use `TESTPULSE_TOKEN` in CI**, not the `token` reporter option — a
 value committed in your Jasmine config file is a real secret leak; an
-environment variable set from a CI secret is not.
+environment variable set from a CI secret is not. Because the env var
+wins for every setting, not just `token`, an unrelated `TESTPULSE_URL`/
+`TESTPULSE_PROJECT` left set in your shell can also silently override
+a value you set in the config file — if a run targets the wrong
+project, check your environment before your config.
 
 ## Build outcome policy
 

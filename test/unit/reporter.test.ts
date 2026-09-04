@@ -147,6 +147,20 @@ describe('TestPulseReporter', () => {
     expect(fs.existsSync(path.join(cwd, '.testpulse', 'attachments'))).toBe(true);
   });
 
+  it('writes a failed marker with a specific reason when required config is missing', async () => {
+    const reporter = new TestPulseReporter({} as never);
+    reporter.specDone(specResult());
+    await reporter.jasmineDone();
+    expect(readResultMarker()).toEqual({
+      present: true,
+      marker: {
+        failed: true,
+        reason: expect.stringContaining('TESTPULSE_URL, TESTPULSE_TOKEN, and TESTPULSE_PROJECT are required'),
+      },
+    });
+    expect(mockedHttpClient.postImport).not.toHaveBeenCalled();
+  });
+
   it('never logs the token', async () => {
     mockedHttpClient.postImport.mockResolvedValue({ status: 500, body: { error: 'boom' } });
     const reporter = makeReporter();

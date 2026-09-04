@@ -3,6 +3,7 @@ import * as path from 'path';
 
 export interface ResultMarker {
   failed: boolean;
+  reason?: string;
 }
 
 function markerPath(): string {

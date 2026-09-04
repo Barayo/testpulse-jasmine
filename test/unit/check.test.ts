@@ -41,4 +41,18 @@ describe('checkExitCode', () => {
     expect(checkExitCode()).toBe(1);
     expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('reporters array entry'));
   });
+
+  it('reports the marker\'s own reason when the reporter ran but recorded a specific cause', () => {
+    const errorSpy = jest.spyOn(console, 'error');
+    writeMarker({ failed: true, reason: 'TESTPULSE_URL, TESTPULSE_TOKEN, and TESTPULSE_PROJECT are required' });
+    expect(checkExitCode()).toBe(1);
+    expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('TESTPULSE_URL, TESTPULSE_TOKEN, and TESTPULSE_PROJECT are required'));
+  });
+
+  it('falls back to the generic message when failed:true has no reason', () => {
+    const errorSpy = jest.spyOn(console, 'error');
+    writeMarker({ failed: true });
+    expect(checkExitCode()).toBe(1);
+    expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('submission failed or was unmatched'));
+  });
 });

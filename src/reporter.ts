@@ -51,10 +51,18 @@ export class TestPulseReporter {
     );
 
     if (!config.url || !config.token || !config.project) {
+      const reason =
+        'TESTPULSE_URL, TESTPULSE_TOKEN, and TESTPULSE_PROJECT are required (set directly, or via reporter options)';
       // eslint-disable-next-line no-console
-      console.error(
-        'testpulse-jasmine: TESTPULSE_URL, TESTPULSE_TOKEN, and TESTPULSE_PROJECT are required (set directly, or via reporter options). Skipping submission.',
-      );
+      console.error(`testpulse-jasmine: ${reason}. Skipping submission.`);
+      // Writing a failed marker here (rather than leaving none at all) is
+      // what lets `check` name the real cause -- otherwise "no marker
+      // found" reads as "the reporter never ran," which is wrong: it did
+      // run, and correctly declined to submit. See design.md's
+      // Risks/Trade-offs (found post-implementation by Paco's real QA
+      // pass, which reproduced `check` misdiagnosing this exact case as
+      // a missing `reporters` array entry).
+      writeResultMarker({ failed: true, reason });
       return;
     }
 

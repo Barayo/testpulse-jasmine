@@ -19,7 +19,11 @@ export function checkExitCode(): number {
   }
   if (outcome.marker.failed) {
     // eslint-disable-next-line no-console
-    console.error('testpulse-jasmine: submission failed or was unmatched with failOnUnmatched set');
+    console.error(
+      outcome.marker.reason
+        ? `testpulse-jasmine: ${outcome.marker.reason}`
+        : 'testpulse-jasmine: submission failed or was unmatched with failOnUnmatched set',
+    );
     return 1;
   }
   return 0;
